@@ -33,12 +33,10 @@ class Witchcraft {
      *
      * @param {chrome} chrome
      * @param {Document} document
-     * @param {Analytics} analytics
      */
-    constructor (chrome, document, analytics = undefined) {
+    constructor (chrome, document) {
         this.chrome = chrome;
         this.document = document;
-        this.analytics = analytics;
 
         this.emptySet = new Set();
 
@@ -76,21 +74,6 @@ class Witchcraft {
 
         // listen for script/stylesheet requests
         this.chrome.runtime.onMessage.addListener(this.onScriptRequest.bind(this));
-
-        this.analytics && this.analytics.send("App", "Load");
-
-        this.resetMetrics();
-    }
-
-    resetMetrics() {
-        this.jsHitCount = 0;
-        this.cssHitCount = 0;
-        this.errorCount = 0;
-        this.failCount = 0;
-        this.jsIncludesHitCount = 0;
-        this.cssIncludesHitCount = 0;
-        this.jsIncludesNotFoundCount = 0;
-        this.cssIncludesNotFoundCount = 0;
     }
 
     /**
@@ -155,7 +138,6 @@ class Witchcraft {
      */
     async onScriptRequest(location, sender) {
         this.clearScriptsIfTopFrame(sender);
-        this.resetMetrics();
 
         await this.loadScript(this.joinNameAndExtension(Witchcraft.globalScriptName, Witchcraft.EXT_JS),
             Witchcraft.EXT_JS, sender);
@@ -175,41 +157,11 @@ class Witchcraft {
         }
 
         this.updateIconAndTitle(sender.tab.id);
-        this.sendMetrics();
     }
 
     /** @private */
     joinNameAndExtension(name, extension) {
         return `${name}.${extension}`;
-    }
-
-    sendMetrics() {
-        if (this.analytics) {
-            if (this.jsHitCount > 0) {
-                this.analytics.send(...Witchcraft.JS_HITS, this.jsHitCount);
-            }
-            if (this.cssHitCount > 0) {
-                this.analytics.send(...Witchcraft.CSS_HITS, this.cssHitCount);
-            }
-            if (this.errorCount > 0) {
-                this.analytics.send(...Witchcraft.ERROR_COUNTS, this.errorCount);
-            }
-            if (this.failCount > 0) {
-                this.analytics.send(...Witchcraft.FAIL_COUNTS, this.failCount);
-            }
-            if (this.jsIncludesHitCount > 0) {
-                this.analytics.send(...Witchcraft.JS_INCLUDE_HITS, this.jsIncludesHitCount);
-            }
-            if (this.cssIncludesHitCount > 0) {
-                this.analytics.send(...Witchcraft.CSS_INCLUDE_HITS, this.cssIncludesHitCount);
-            }
-            if (this.jsIncludesNotFoundCount > 0) {
-                this.analytics.send(...Witchcraft.JS_INCLUDES_NOT_FOUND, this.jsIncludesNotFoundCount);
-            }
-            if (this.cssIncludesNotFoundCount > 0) {
-                this.analytics.send(...Witchcraft.CSS_INCLUDES_NOT_FOUND, this.cssIncludesNotFoundCount);
-            }
-        }
     }
 
     /**
