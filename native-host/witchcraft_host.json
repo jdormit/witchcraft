@@ -1,0 +1,7 @@
+{
+  "name": "witchcraft_host",
+  "description": "Native host for the Witchcraft userscript manager",
+  "path": "/Users/jdormit/witchcraft/native-host/witchcraft_host.py",
+  "type": "stdio",
+  "allowed_extensions": ["witchcraft@witch.craft"]
+}

@@ -40,11 +40,6 @@ class Witchcraft {
 
         this.emptySet = new Set();
 
-        this.serverPort = 5743;
-        this.defaultServerAddress = `http://127.0.0.1:${this.serverPort}/`;
-        const savedServerAddress = typeof localStorage !== "undefined" && localStorage.getItem("server-address");
-        this.serverAddress = savedServerAddress || this.defaultServerAddress;
-        /** @type {Boolean} */
         this.isServerReachable = true;
 
         /** @type {Map<Number, Set<String>>} map with set of scripts loaded per tab, with the sole purpose of keeping
@@ -72,8 +67,16 @@ class Witchcraft {
         this.includeDirectiveRegexCss = /^[ \t]*\/\*[ \t]*@include[ \t]*(".*?"|\S+)[ \t]*\*\/.*$/mg;
         this.fullUrlRegex = /^https?:\/\//;
 
+        this.defaultScriptDirectory = "~/witchcraft-scripts/"
+        const savedScriptDirectory = typeof localStorage !== "undefined" && localStorage.getItem("script-directory");
+        this.baseScriptDirectory = savedScriptDirectory || this.defaultScriptDirectory;
+
         // listen for script/stylesheet requests
         this.chrome.runtime.onMessage.addListener(this.onScriptRequest.bind(this));
+
+        this.getAbsolutePath(this.baseScriptDirectory).then(path => {
+            this.absoluteScriptDirectory = path;
+        });
     }
 
     /**
@@ -103,26 +106,51 @@ class Witchcraft {
     }
 
     /**
+     * Resolves ~ in the filename via the native host
+     *
+     * @param {String} fileName - the file name to resolve
+     * @returns {Promise<String>} resolved file name
+     */
+    async getAbsolutePath(fileName) {
+        const response = await browser.runtime.sendNativeMessage(
+            "witchcraft_host", {type: "resolve", filename: fileName}
+        );
+        return response.filename;
+    }
+
+    /**
+     * @param {String} scriptFileName - the script file name to open via the native host
+     * @returns {Promise<Boolean>}
+     */
+    async openFileNative(scriptFileName) {
+        const fullFileName = this.baseScriptDirectory + scriptFileName;
+        const response = await browser.runtime.sendNativeMessage(
+            "witchcraft_host", {type: "open", filename: fullFileName}
+        )
+        if (response.error) {
+            console.error("Error opening file with native host", response);
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * @param {String} scriptFileName - the script file name to query for
-     * @param {String} scriptType
      * @returns {Promise<String>} file contents or null if file does not exist
      */
-    async queryServerForFile(scriptFileName, scriptType) {
+    async queryNativeHost(scriptFileName) {
         try {
-            const fullUrl = this.fullUrlRegex.test(scriptFileName) ? scriptFileName : this.serverAddress + scriptFileName;
-            const response = await this.fetch(fullUrl);
-            this.isServerReachable = true;
-
-            if (response.status === 200) {
-                scriptType === Witchcraft.EXT_JS ? this.jsHitCount++ : this.cssHitCount++;
-                return await response.text();
-            } else if (response.status === 404) {
-                return null;
-            } else {
-                this.errorCount++;
+            const fullFileName = this.baseScriptDirectory + scriptFileName;
+            const response = await browser.runtime.sendNativeMessage(
+                "witchcraft_host", {type: "contents", filename: fullFileName}
+            );
+            if (response.error && !response.error.includes("No such file or directory")) {
                 this.isServerReachable = false;
+                console.error("Error response from native host", response);
                 return null;
             }
+            this.isServerReachable = true;
+            return response.contents;
         } catch (e) {
             this.failCount++;
             this.isServerReachable = false;
@@ -131,7 +159,7 @@ class Witchcraft {
     }
 
     /**
-     * Ask the local server to retrieve all relevant scripts for this url.
+     * Ask the native host to retrieve all relevant scripts for this url.
      *
      * @param {Location} location - the Location object of the tab being loaded
      * @param {MessageSender} sender - the sender context of the content script that called us
@@ -209,7 +237,7 @@ class Witchcraft {
      * @returns {Promise<String>}
      */
     async loadScript(scriptFileName, scriptType, sender, shouldSend = true) {
-        let scriptContents = await this.queryServerForFile(scriptFileName, scriptType);
+        let scriptContents = await this.queryNativeHost(scriptFileName);
         if (scriptContents) {
             scriptContents = await this.processIncludeDirectives(scriptContents, scriptFileName, scriptType, sender);
             if (shouldSend) {
@@ -381,30 +409,39 @@ class Witchcraft {
     }
 
     /**
-     * Used by the popup window to construct the URL of each loaded file.
+     * Used by the popup window to construct the filepath of each loaded file.
      *
      * @returns {String}
      */
-    getServerAddress() {
-        return this.serverAddress;
+    getScriptDirectory() {
+        return this.baseScriptDirectory;
     }
 
     /**
-     * Called by the popup window to update the server address.
+     * Used by the popup window to construct the filepath of each loaded file.
      *
-     * @param {String} serverAddress
      * @returns {String}
      */
-    setServerAddress(serverAddress) {
-        serverAddress = serverAddress.trim();
-        if (serverAddress.length === 0) {
-            serverAddress = this.defaultServerAddress;
+    getAbsoluteScriptDirectory() {
+        return this.absoluteScriptDirectory;
+    }
+
+    /**
+     * Called by the popup window to update the script directory.
+     *
+     * @param {String} scriptDirectory
+     * @returns {String}
+     */
+    setScriptDirectory(scriptDirectory) {
+        scriptDirectory = scriptDirectory.trim();
+        if (scriptDirectory.length === 0) {
+            scriptDirectory = this.defaultScriptDirectory;
         }
-        if (!serverAddress.endsWith("/")) {
-            serverAddress += "/";
+        if (!scriptDirectory.endsWith("/")) {
+            scriptDirectory += "/";
         }
-        this.serverAddress = serverAddress;
-        typeof localStorage !== "undefined" && localStorage.setItem("server-address", this.serverAddress);
+        this.baseScriptDirectory = scriptDirectory;
+        typeof localStorage !== "undefined" && localStorage.setItem("script-directory", this.baseScriptDirectory);
     }
 
     /**

@@ -1,8 +1,8 @@
 {
-  "name": "Witchcraft: JS/CSS injector",
+  "name": "Witchcraft: userscript injector",
   "short_name": "Witchcraft",
   "manifest_version": 2,
-  "version": "2.6.1",
+  "version": "3.0.0",
   "description": "Witchcraft loads custom Javascript and CSS directly from a folder in your file system. Think GreaseMonkey for developers.",
   "icons": {
     "16": "witch-16.png",
@@ -32,5 +32,11 @@
     "page": "background.html",
     "persistent": false
   },
-  "content_security_policy": "script-src 'self'; object-src 'self'"
+  "permissions": ["nativeMessaging"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "witchcraft@witch.craft",
+      "strict_min_version": "50.0"
+    }
+  }
 }

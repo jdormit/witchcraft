@@ -36,7 +36,7 @@ class Popup {
     makeButtonFromAnchor(id, pageName = id) {
         const anchor = typeof id === "string" ? document.getElementById(id) : id;
         anchor.addEventListener("click", () => {
-            chrome.tabs.create({ url: anchor.getAttribute("href") });
+            this.witchcraft.openFileNative(anchor.getAttribute("data-filename"));
             return false;
         });
     }
@@ -54,8 +54,6 @@ class Popup {
         const currentTabId = await this.getCurrentTabId();
         const scriptNames = this.witchcraft.getScriptNamesForTab(currentTabId);
 
-        const serverAddress = this.witchcraft.getServerAddress();
-
         const hasScripts = scriptNames && scriptNames.size > 0;
         noScriptsElement.classList.toggle("hidden", hasScripts);
         scriptsTable.classList.toggle("hidden", !hasScripts);
@@ -63,16 +61,14 @@ class Popup {
         if (hasScripts) {
             for (const scriptName of scriptNames) {
                 const fileName = scriptName.substr(scriptName.lastIndexOf("/") + 1);
-                const fullUrl = this.fullUrlRegex.test(scriptName) ? scriptName : serverAddress + scriptName;
 
                 const tdName = document.createElement("td");
                 tdName.classList.add("script-name");
-                const aName = document.createElement("a");
+                const aName = document.createElement("div");
+                aName.classList.add("script-button");
                 tdName.appendChild(aName);
-                aName.target = "_blank";
                 aName.innerText = fileName;
-                aName.href = fullUrl;
-                aName.setAttribute("title", aName.href);
+                aName.setAttribute("data-filename", fileName)
                 this.makeButtonFromAnchor(aName, "script");
 
                 const tdType = document.createElement("td");
@@ -106,17 +102,17 @@ class Popup {
     }
 
     makeAdvancedPanel() {
-        const serverAddressInput = document.getElementById("server-address");
-        serverAddressInput.value = this.witchcraft.getServerAddress();
-        serverAddressInput.addEventListener("input", event => {
-            this.witchcraft.setServerAddress(event.target.value);
+        const scriptDirInput = document.getElementById("script-directory");
+        scriptDirInput.value = this.witchcraft.getScriptDirectory();
+        scriptDirInput.addEventListener("input", event => {
+            this.witchcraft.setScriptDirectory(event.target.value);
         });
 
-        const resetButton = document.getElementById("server-address-reset");
+        const resetButton = document.getElementById("script-directory-reset");
         resetButton.addEventListener("click", event => {
-            console.info(this.witchcraft.defaultServerAddress);
-            this.witchcraft.setServerAddress(this.witchcraft.defaultServerAddress);
-            serverAddressInput.value = this.witchcraft.getServerAddress();
+            console.info(this.witchcraft.defaultScriptDirectory);
+            this.witchcraft.setScriptDirectory(this.witchcraft.defaultScriptDirectory);
+            scriptDirInput.value = this.witchcraft.getScriptDirectory();
             event.preventDefault();
             return false;
         });

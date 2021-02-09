@@ -46,6 +46,10 @@ td.script-name {
     font-family: monospace;
 }
 
+td.script-name div.script-button {
+    cursor: pointer;
+}
+
 td.js, td.css {
     text-align: center;
     font-weight: bold;
